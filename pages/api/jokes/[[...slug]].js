@@ -24,25 +24,36 @@ let jokes = [
 
 let nextId = jokes.length + 1;
 
+// The magic key your students must provide for PUT and DELETE
+const API_KEY = "apiboxpractice764235";
+
 export default function handler(req, res) {
   // CORS – allows students to call the API from any browser app
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
   // Handle preflight requests
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Parse the URL path. With [[...slug]], slug is undefined for /api/jokes,
-  // or an array for sub‑paths like ["random"] or ["1"].
+  // Parse the URL path
   const { slug } = req.query;
   const path = slug ? `/${slug.join("/")}` : "";
 
+  // Helper: check authentication for destructive methods
+  function requireApiKey() {
+    const key = req.headers["x-api-key"];
+    if (key !== API_KEY) {
+      res.status(401).json({ error: "Unauthorized – valid x-api-key header required" });
+      return false;
+    }
+    return true;
+  }
+
   // ========================
   // 1. GET /api/jokes
-  // Return all jokes. Optional ?category=xxx
   // ========================
   if (req.method === "GET" && path === "") {
     const { category } = req.query;
@@ -55,7 +66,6 @@ export default function handler(req, res) {
 
   // ========================
   // 2. GET /api/jokes/random
-  // Return a single random joke
   // ========================
   if (req.method === "GET" && path === "/random") {
     if (jokes.length === 0) {
@@ -67,7 +77,6 @@ export default function handler(req, res) {
 
   // ========================
   // 3. GET /api/jokes/{id}
-  // Return a joke by its numeric ID
   // ========================
   if (req.method === "GET" && /^\/\d+$/.test(path)) {
     const id = parseInt(path.slice(1), 10);
@@ -80,7 +89,7 @@ export default function handler(req, res) {
 
   // ========================
   // 4. POST /api/jokes
-  // Create a new joke. Body: { "content": "...", "category": "..." }
+  // No authentication required – anyone can add jokes
   // ========================
   if (req.method === "POST" && path === "") {
     const { content, category } = req.body;
@@ -98,9 +107,11 @@ export default function handler(req, res) {
 
   // ========================
   // 5. PUT /api/jokes/{id}
-  // Update a joke. Body can include content and/or category.
+  // Requires API key
   // ========================
   if (req.method === "PUT" && /^\/\d+$/.test(path)) {
+    if (!requireApiKey()) return;
+
     const id = parseInt(path.slice(1), 10);
     const jokeIndex = jokes.findIndex((j) => j.id === id);
     if (jokeIndex === -1) {
@@ -114,9 +125,11 @@ export default function handler(req, res) {
 
   // ========================
   // 6. DELETE /api/jokes/{id}
-  // Remove a joke
+  // Requires API key
   // ========================
   if (req.method === "DELETE" && /^\/\d+$/.test(path)) {
+    if (!requireApiKey()) return;
+
     const id = parseInt(path.slice(1), 10);
     const jokeIndex = jokes.findIndex((j) => j.id === id);
     if (jokeIndex === -1) {
