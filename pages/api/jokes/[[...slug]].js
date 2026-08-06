@@ -1,4 +1,4 @@
-// In-memory joke storage (resets on cold start – perfect for practice)
+// In-memory joke storage (resets on cold start)
 let jokes = [
   {
     id: 1,
@@ -24,25 +24,21 @@ let jokes = [
 
 let nextId = jokes.length + 1;
 
-// The magic key your students must provide for PUT and DELETE
 const API_KEY = "apiboxpractice764235";
 
 export default function handler(req, res) {
-  // CORS – allows students to call the API from any browser app
+  // CORS
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
 
-  // Handle preflight requests
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
 
-  // Parse the URL path
   const { slug } = req.query;
   const path = slug ? `/${slug.join("/")}` : "";
 
-  // Helper: check authentication for destructive methods
   function requireApiKey() {
     const key = req.headers["x-api-key"];
     if (key !== API_KEY) {
@@ -53,19 +49,47 @@ export default function handler(req, res) {
   }
 
   // ========================
-  // 1. GET /api/jokes
+  // GET /api/jokes
+  // Supports query params: ?id=3, ?ids=1,2,3, ?category=dad
   // ========================
   if (req.method === "GET" && path === "") {
-    const { category } = req.query;
-    let result = jokes;
-    if (category) {
-      result = jokes.filter((j) => j.category === category);
+    const { id, ids, category } = req.query;
+
+    // Single ID via ?id=3
+    if (id) {
+      const numericId = parseInt(id, 10);
+      if (isNaN(numericId)) {
+        return res.status(400).json({ error: "Invalid id parameter" });
+      }
+      const joke = jokes.find((j) => j.id === numericId);
+      if (!joke) {
+        return res.status(404).json({ error: "Joke not found" });
+      }
+      return res.status(200).json(joke);
     }
-    return res.status(200).json(result);
+
+    // Multiple IDs via ?ids=1,2,3
+    if (ids) {
+      const idArray = ids.split(",").map((i) => parseInt(i.trim(), 10));
+      if (idArray.some(isNaN)) {
+        return res.status(400).json({ error: "ids parameter contains invalid numbers" });
+      }
+      const result = jokes.filter((j) => idArray.includes(j.id));
+      return res.status(200).json(result);
+    }
+
+    // Category filter via ?category=dad
+    if (category) {
+      const result = jokes.filter((j) => j.category === category);
+      return res.status(200).json(result);
+    }
+
+    // No query params → return all jokes
+    return res.status(200).json(jokes);
   }
 
   // ========================
-  // 2. GET /api/jokes/random
+  // GET /api/jokes/random
   // ========================
   if (req.method === "GET" && path === "/random") {
     if (jokes.length === 0) {
@@ -76,7 +100,7 @@ export default function handler(req, res) {
   }
 
   // ========================
-  // 3. GET /api/jokes/{id}
+  // GET /api/jokes/{id} (path style, still works)
   // ========================
   if (req.method === "GET" && /^\/\d+$/.test(path)) {
     const id = parseInt(path.slice(1), 10);
@@ -88,8 +112,7 @@ export default function handler(req, res) {
   }
 
   // ========================
-  // 4. POST /api/jokes
-  // No authentication required – anyone can add jokes
+  // POST /api/jokes
   // ========================
   if (req.method === "POST" && path === "") {
     const { content, category } = req.body;
@@ -106,8 +129,7 @@ export default function handler(req, res) {
   }
 
   // ========================
-  // 5. PUT /api/jokes/{id}
-  // Requires API key
+  // PUT /api/jokes/{id} (requires API key)
   // ========================
   if (req.method === "PUT" && /^\/\d+$/.test(path)) {
     if (!requireApiKey()) return;
@@ -124,8 +146,7 @@ export default function handler(req, res) {
   }
 
   // ========================
-  // 6. DELETE /api/jokes/{id}
-  // Requires API key
+  // DELETE /api/jokes/{id} (requires API key)
   // ========================
   if (req.method === "DELETE" && /^\/\d+$/.test(path)) {
     if (!requireApiKey()) return;
@@ -139,6 +160,6 @@ export default function handler(req, res) {
     return res.status(200).json({ message: "Joke deleted successfully" });
   }
 
-  // If no route matched
+  // 404 for unmatched routes
   return res.status(404).json({ error: "Route not found" });
 }
